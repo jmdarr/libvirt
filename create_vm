@@ -297,6 +297,12 @@ function create_vm() {
   eval ${cmd}
 }
 
+function pause_for_provision() {
+
+}
+
+
+
 ### MAIN
 # error handling
 trap "exit 1" TERM
@@ -326,3 +332,4 @@ write_meta_data
 copy_template_to_image
 create_iso_for_cloud_init
 create_vm
+pause_for_provision
