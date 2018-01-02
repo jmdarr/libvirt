@@ -31,6 +31,7 @@ image_path="/var/lib/libvirt/images" # the path to where we store our vm qcow2 i
 net_prefix="192.168.0."              # the /24 non-cidr prefix for a network you provision to
 net_firstaddr="100"                  # the first value of the last octet of our /24
 net_lastaddr="200"                   # the last value of the last octet of our /24
+provision_timeout="30"               # provisioning timeout in seconds
 
 ### FUNCTIONS
 function parse_args() {
@@ -298,10 +299,35 @@ function create_vm() {
 }
 
 function pause_for_provision() {
+  echo -n "Pausing for provision (max ${provision_timeout}s)"
+  local c=0
+  while [ c < 30 ]; do
+    ping -c 1 -w 1 ${i} && { break; } || echo -n '.'
+    c=$((${c}+1))
+  done
+}
+
+function clean_up_cloud_init() {
+  echo "$(date -R) Cleaning up cloud-init..."
+  virsh change-media ${e} hda --eject --config | ${teebin} -a ${log_file}
+  rm $USER_DATA $CI_ISO 
+}
+
+function check_for_free_space() {
 
 }
 
+function shutdown_for_disk_resize() {
 
+}
+
+function resize_disk() {
+
+}
+
+function start_vm() {
+
+}
 
 ### MAIN
 # error handling
@@ -333,3 +359,11 @@ copy_template_to_image
 create_iso_for_cloud_init
 create_vm
 pause_for_provision
+clean_up_cloud_init
+check_for_free_space
+shutdown_for_disk_resize
+resize_disk
+start_vm
+
+echo "All done."
+echo
