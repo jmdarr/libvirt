@@ -1,0 +1,328 @@
+#!/bin/env bash
+
+# This script was designed to consume a qcow2 image from:
+# https://cloud.centos.org/centos/7/images/
+
+## needs to:
+# set resolv.conf
+# add new user
+# set user pw
+# adjust disk size. keep in mind current image uses 8gb so we
+#    will need to calculate the value the new image should be
+#    minus 8GB
+
+### VARIABLES
+# option defaults
+e="hostname"   # hostname
+o="home.local" # domain
+i=""           # ip, intentionally left blank
+d="80"         # disk size, in GB
+m="512"        # memory quantity, in MB
+c="2"          # cpu count
+u="mudkip"     # username to add
+               # below: ssh key for user
+s="ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAyaJkyZ3anwVLSZ1gqJKAJfANas39n0Io1bk1iyoeMXT7XrWpIQcE2cZr6SCSG3c1mG1jdSelitCFw0Q89AGZyHvv3LrNiv5qRQgJc1Z/uMoqxk4SpeHr9dCrNf5FgsJiUbb9Mlmr3T55Kh6P6us6jO4wet77+cKheR/vMgk2ichSsIzL/3+CQbECoDH4TDDTSq5AelnGr9mEGf/kLNCpOQLAl7DcOJaPyStsX7m57Ow8fBNa5WFt/LCyJf53CI/Xn4SHkiO7hzBqdgcUL/A+WOO6e7qC928XK4iWYTQlLbROydMLklsLrOwutgsnLVy+CI11v2kyDw32iPnBi7ewiw=="
+s="ssh-rsa THISISNOTAREALHASHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHVAMPIRESSUCK"
+a="y"          # sudo access, y/n
+# others
+template="/full/path/to/CentOS-7-x86_64-GenericCloud-1711.qcow2" 
+                                     # above: template path
+image_path="/var/lib/libvirt/images" # the path to where we store our vm qcow2 images
+net_prefix="192.168.0."              # the /24 non-cidr prefix for a network you provision to
+net_firstaddr="100"                  # the first value of the last octet of our /24
+net_lastaddr="200"                   # the last value of the last octet of our /24
+
+### FUNCTIONS
+function parse_args() {
+  local OPTIND v
+  while getopts ":e:o:i:d:m:c:u:s:a" v; do
+    case ${v} in
+      e)
+       #hostname
+       echo "${v} => ${OPTARG}"
+       echo "hostname => ${e}"
+       e=${OPTARG}
+       echo "hostname => ${e}"
+       ;;
+      o)
+       #domain
+       o=${OPTARG}
+       ;;
+      i)
+       #ip
+       i=${OPTARG}
+       ;;
+      d)
+       #disk
+       d=${OPTARG}
+       ;;
+      m)
+       #memory
+       m=${OPTARG}
+       ;;
+      c)
+       #cpu
+       c=${OPTARG}
+       ;;
+      u)
+       #username
+       u=${OPTARG}
+       ;;
+      s)
+       #ssh key
+       s=${OPTARG}
+       ;;
+      a)
+       #sudo
+       [[ "${OPTARG}" =~ ^[YyNn]$ ]] || { echo "Invalid option value"; exit 1; }
+       a=$(echo "${OPTARG}" | $trbin [:upper:] [:lower:])
+       ;;
+      *)
+       show_help
+       ;;
+    esac
+  done
+}
+
+function get_confirmation() {
+  local z=""
+  read -e -p "$@ (y|n)[y]: " z
+  [[ "${z}" =~ ^[YyNn]$ ]] || z='y'
+  [[ "${z}" =~ ^[Yy]$ ]] && return 0 || return 1
+}
+
+function get_input() {
+  local v=""
+  local d="$2"
+  local dd=$d
+  local m="$1"
+  [ ${#d} -gt 16 ] && dd="${d:0:16}..."
+  read -e -p "${m} [${dd}]: " v
+  if [ ! -z "${v}" ]; then
+    if [[ "${v}" =~ ^\s{1,}$ ]]; then
+      echo $d
+    else
+      echo $v
+    fi
+  else
+    echo $d
+  fi
+}
+
+function ensure_requirements() {
+  whichbin=$(which which >/dev/null 2>&1 || { echo "This script requires 'which'. Please install and re-run."; exit 1; })
+  for b in virt-install genisoimage tee date tr virsh touch shuf ping; do
+    which ${b} >/dev/null 2>&1 || { echo "This script requires '${b}'. Please install and re-run."; exit 1; }
+  done
+  setbins
+  [ -f ${template} ] || { echo "Disk template '${template}' not found. Please ensure this is available and re-run."; exit 1; }
+  [ -d ${image_path} ] && {
+    $touchbin "${image_path}/.write_test" 2>/dev/null || { echo "Unable to write to image path '${image_path}'. Please correct permissions and re-run."; exit 1; }
+  } || {
+    echo "Unable to find image path '${image_path}'. Please ensure it exists and re-run."; exit 1;
+  } && rm -f "${image_path}/.write_test"
+}
+
+function setbins() {
+  virshbin=$(which virsh)
+  touchbin=$(which touch)
+  shufbin=$(which shuf)
+  pingbin=$(which ping)
+  trbin=$(which tr)
+  datebin=$(which date)
+  teebin=$(which tee)
+  genisoimagebin=$(which genisoimage)
+  virtinstallbin=$(which virt-install)
+}
+
+function get_unused_netaddr() {
+  local retval=0
+  while [ $retval -ne 1 ]; do
+    local r=$(${shufbin} -i ${net_firstaddr}-${net_lastaddr} -n 1)
+    local n="${net_prefix}${r}"
+    ${pingbin} -c 1 -w 1 ${n} >/dev/null 2>&1
+    local retval=$?
+  done
+  echo $n
+}
+
+function interactive_start() {
+  local v=""
+  interactive=1
+  n=$(get_unused_netaddr)
+  e=$(get_input "Hostname" "${e}")
+  o=$(get_input "DNS Domain" "${o}")
+  i=$(get_input "IP" "${n}")
+  d=$(get_input "Disk (GB)" "${d}")
+  m=$(get_input "Memory (MB)" "${m}")
+  c=$(get_input "CPUs" "${c}")
+  u=$(get_input "Username" "${u}")
+  s=$(get_input "SSH Key" "${s}")
+  get_confirmation "Sudo?" && a='y' || a='n'
+}
+
+function show_help() {
+  echo
+  echo 'NAME'
+  echo '  create_vm - creates a new libvirt vm from a series of options'
+  echo
+  echo 'DESCRIPTION'
+  echo '  This is a highly modified version of http://giovannitorres.me/create-a-linux-lab-on-kvm-using-cloud-images.html'
+  echo '  create_vm can also be ran interactively by not supplying any args.'
+  echo
+  echo 'Usage:'
+  echo '  create_vm [OPTION] <ARG>'
+  echo
+  echo '  Options:'
+  echo '    -e <shortname>             a'
+  echo '    -o <dns domain>            a'
+  echo '    -i <ip>                    a'
+  echo '    -d <disk size in GB>       a'
+  echo '    -m <memory quantity in GB> a'
+  echo '    -c <cpu count>             a'
+  echo '    -u <username>              a'
+  echo '    -s <ssh key>               a'
+  echo '    -a (y|n)                   a'
+  echo
+  exit 1
+}
+
+function display_new_vm_info() {
+  echo
+  echo 'NEW VM:'
+  echo '-------------------'
+  echo "Hostname:     $e"
+  echo "DNS Domain:   $o"
+  echo "IP:           $i"
+  echo "Disk:         ${d}GB"
+  echo "Memory:       ${m}MB"
+  echo "CPUs:         $c"
+  echo
+  echo 'ADD USER'
+  echo '-------------------'
+  echo "Username:     $u"
+  echo "SSH Key:      ${s:0:16}..."
+  echo "Sudo enabled? $a"
+  echo
+}
+
+function confirm_start() {
+  get_confirmation 'Does the above look correct?' || {
+    echo "Exiting on user input..."
+    exit 2
+  }
+}
+
+function check_for_overwrite() {
+  $virshbin dominfo ${e} >/dev/null 2>&1 && {
+    get_confirmation "VM '${e}' already exists. Overwrite?" || {
+      echo "Exiting on user input..."
+      exit 2
+    } && overwrite='y'
+  }
+}
+
+function nuke_and_pave() {
+  rm -rf ${image_path}
+  mkdir -p ${image_path}
+  [ "${overwrite}" == 'y' ] && {
+    echo "$(${datebin} -R) Destroying the '${e}' domain (if it exists)..." | ${teebin} -a ${log_file}
+    $virshbin destroy "${e}" 2>&1 | ${teebin} -a ${log_file}
+    $virshbin undefine "${e}" 2>&1 | ${teebin} -a ${log_file}
+  }
+}
+
+function write_user_data() {
+  cat > ${user_data} << _EOF_
+#cloud-config
+
+# Hostname management
+preserve_hostname: False
+hostname: ${e}
+fqdn: ${e}.${o}
+
+# Remove cloud-init when finished with it and write our network config out
+runcmd:
+  - [ yum, -y, remove, cloud-init ]
+  - sed -i '/IPADDR/d' /etc/sysconfig/network-scripts/ifcfg-eth0
+  - echo "IPADDR=${i}" >> /etc/sysconfig/network-scripts/ifcfg-eth0
+  - /sbin/service network restart
+
+# Configure where output will go
+output:
+  all: ">> /var/log/cloud-init.log"
+
+# configure interaction with ssh server
+ssh_svcname: ssh
+ssh_deletekeys: True
+ssh_genkeytypes: ['rsa', 'ecdsa']
+
+# Install my public ssh key to the first user-defined user configured
+# in cloud.cfg in the template
+ssh_authorized_keys:
+  - ${s}
+
+# Setup resolv.conf
+manage_resolv_conf: true
+resolv_conf:
+  nameservers: ['192.168.0.3']
+  searchdomains:
+    - solarsquid.local
+  domain: solarsquid.local
+_EOF_
+}
+
+function write_meta_data() {
+  echo -e "instance-id: ${e}\nlocal-hostname: ${e}" > ${meta_data}
+}
+
+function copy_template_to_image() {
+  echo "$(${datebin} -R) Copying template image '${template}' to '${image}'..." | ${teebin} -a ${log_file}
+  cp ${template} ${image} || { echo "Failure to copy. Exiting." | ${teebin} -a ${log_file}; exit 1; }
+}
+
+function create_iso_for_cloud_init() {
+  echo "$(${datebin} -R) Generating ISO for cloud-init..." | ${teebin} -a ${log_file}
+  echo "[INFO] Generating with the following parameters:" | ${teebin} -a ${log_file}
+  cmd="${genisoimagebin} -output ${ci_iso} -volid cidata -joliet -r ${user_data} ${meta_data}"
+  echo "${cmd}" | ${teebin} -a ${log_file}
+  eval ${cmd}
+}
+
+function create_vm() {
+  echo "$(${datebin} -R) Installing the domain and adjusting the configuration..." | ${teebin} -a ${log_file}
+  echo "[INFO] Installing with the following parameters:" | ${teebin} -a ${log_file}
+  cmd="${virtinstallbin} --import --name ${e} --ram ${m} --vcpus ${c} --disk ${image},format=qcow2,bus=virtio --disk ${ci_iso},device=cdrom --network bridge=br0,model=virtio --os-type=linux --os-variant=rhel7 --noautoconsole"
+  echo "${cmd}" | ${teebin} -a ${log_file}
+  eval ${cmd}
+}
+
+### MAIN
+# error handling
+trap "exit 1" TERM
+export TOP_PID=$$
+
+ensure_requirements
+
+[ $# -eq 0 ] && interactive_start || parse_args $@
+
+# print info and confirm this is what we want
+display_new_vm_info
+confirm_start
+
+# set some other vars we need
+image_path="${image_path}/${e}"
+user_data="${image_path}/user-data"
+meta_data="${image_path}/meta-data"
+ci_iso="${image_path}/${e}-cidata.iso"
+image="${image_path}/${e}.qcow2"
+log_file="${image_path}/${e}.log"
+bridge="virbr0"
+
+check_for_overwrite
+nuke_and_pave
+write_user_data
+write_meta_data
+copy_template_to_image
+create_iso_for_cloud_init
+create_vm
