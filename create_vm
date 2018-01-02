@@ -3,10 +3,8 @@
 # This script was designed to consume a qcow2 image from:
 # https://cloud.centos.org/centos/7/images/
 
-## needs to:
-# set resolv.conf
-# add new user
-# set user pw
+# TO DO:
+# unmount cdrom
 # adjust disk size. keep in mind current image uses 8gb so we
 #    will need to calculate the value the new image should be
 #    minus 8GB
