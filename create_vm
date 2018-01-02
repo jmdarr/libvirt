@@ -1,6 +1,8 @@
 #!/bin/env bash
 
-# This script was designed to consume a qcow2 image from:
+# This script is heavily based on:
+# http://giovannitorres.me/create-a-linux-lab-on-kvm-using-cloud-images.html
+# and is intended to consume a qcow2 image from:
 # https://cloud.centos.org/centos/7/images/
 
 # TO DO:
