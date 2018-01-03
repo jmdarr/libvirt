@@ -6,7 +6,12 @@
 # https://cloud.centos.org/centos/7/images/
 
 # TO DO:
-# unmount cdrom
+# adjust parse_args to keep the defaults if the parsed arg for
+#    the ip isn't passed - in fact, it shouldn't be
+# finish adjusting the show_help information for arguments
+# finish up testing the wait on ping during prov as well as
+#    the wait on shutdown and the shutdown - those are
+#    untested.
 # adjust disk size. keep in mind current image uses 8gb so we
 #    will need to calculate the value the new image should be
 #    minus 8GB
@@ -25,7 +30,7 @@ s="ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAyaJkyZ3anwVLSZ1gqJKAJfANas39n0Io1bk1iyoeM
 s="ssh-rsa THISISNOTAREALHASHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHVAMPIRESSUCK"
 a="y"          # sudo access, y/n
 # others
-template="/full/path/to/CentOS-7-x86_64-GenericCloud-1711.qcow2" 
+template="/full/path/to/CentOS-7-x86_64-GenericCloud-1711.qcow2"
                                      # above: template path
 image_path="/var/lib/libvirt/images" # the path to where we store our vm qcow2 images
 net_prefix="192.168.0."              # the /24 non-cidr prefix for a network you provision to
@@ -41,10 +46,7 @@ function parse_args() {
     case ${v} in
       e)
        #hostname
-       echo "${v} => ${OPTARG}"
-       echo "hostname => ${e}"
        e=${OPTARG}
-       echo "hostname => ${e}"
        ;;
       o)
        #domain
@@ -177,9 +179,9 @@ function show_help() {
   echo '  create_vm [OPTION] <ARG>'
   echo
   echo '  Options:'
-  echo '    -e <shortname>             a'
-  echo '    -o <dns domain>            a'
-  echo '    -i <ip>                    a'
+  echo '    -e <shortname>             the short hostname for the new server'
+  echo '    -o <dns domain>            the dns domain for the new server'
+  echo '    -i <ip>                    '
   echo '    -d <disk size in GB>       a'
   echo '    -m <memory quantity in GB> a'
   echo '    -c <cpu count>             a'
@@ -323,10 +325,10 @@ function clean_up_cloud_init() {
 }
 
 function check_for_free_space() {
-  local s=$(${dfbin} ${image_path} | awk '{ print $4 }' | tail -n 1)
+  local availbytes=$(${dfbin} ${image_path} | awk '{ print $4 }' | tail -n 1)
   # 1073741824 bytes in 1 gb
-  local nb=$(((((${d}*1024)*1024)*1024)))
-  [ ${nb} -ge ${s} ] && { echo "Size exceeds available space, unable to continue."; exit 1; }
+  local neededbytes=$((((${d}*1000)*1000)))
+  [ ${neededbytes} -ge ${availbytes} ] && { echo "Size (${neededbytes}) exceeds available space (${availbytes}), unable to continue."; exit 1; }
 }
 
 function wait_for_cloud_init_shutdown() {
