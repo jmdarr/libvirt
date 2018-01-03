@@ -38,62 +38,51 @@ provision_timeout="30"               # provisioning timeout in seconds
 ### FUNCTIONS
 function parse_args() {
   local OPTIND v
-  i="${net_prefix}${n}"
   while getopts ":e:o:i:d:m:c:u:s:a" v; do
-    defaults="n"
-    if [ ! -z "${v}" ]; then
-      if [[ "${v}" =~ ^\s{1,}$ ]]; then
-        defaults="y"
-      fi
-    else
-      defaults='y'
-    fi
-
     case ${v} in
       e)
        #hostname
-       [ '${defaults}' == 'n' ] && e=${OPTARG}
+       e=${OPTARG}
        ;;
       o)
        #domain
-       [ '${defaults}' == 'n' ] && o=${OPTARG}
+       o=${OPTARG}
        ;;
       i)
        #ip
-       [ '${defaults}' == 'n' ] && i=${OPTARG} || i="${net_prefix}$(get_unused_netaddr)"
+       i=${OPTARG}
        ;;
       d)
        #disk
-       [ '${defaults}' == 'n' ] && d=${OPTARG}
+       d=${OPTARG}
        ;;
       m)
        #memory
-       [ '${defaults}' == 'n' ] && m=${OPTARG}
+       m=${OPTARG}
        ;;
       c)
        #cpu
-       [ '${defaults}' == 'n' ] && c=${OPTARG}
+       c=${OPTARG}
        ;;
       u)
        #username
-       [ '${defaults}' == 'n' ] && u=${OPTARG}
+       u=${OPTARG}
        ;;
       s)
        #ssh key
-       [ '${defaults}' == 'n' ] && s=${OPTARG}
+       s=${OPTARG}
        ;;
       a)
        #sudo
-       [ '${defaults}' == 'n' ] && {
-         [[ "${OPTARG}" =~ ^[YyNn]$ ]] || { echo "Invalid option value"; exit 1; }
-         a=$(echo "${OPTARG}" | $trbin [:upper:] [:lower:])
-       }
+       [[ "${OPTARG}" =~ ^[YyNn]$ ]] || { echo "Invalid option value"; exit 1; }
+       a=$(echo "${OPTARG}" | $trbin [:upper:] [:lower:])
        ;;
       *)
        show_help
        ;;
     esac
   done
+  [ "${i}" == "" ] && i=$(get_unused_netaddr)
 }
 
 function get_confirmation() {
