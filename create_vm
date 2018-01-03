@@ -272,6 +272,12 @@ resolv_conf:
   searchdomains:
     - solarsquid.local
   domain: solarsquid.local
+
+# shut the server down for disk resizing at the end.
+power_state:
+  mode: poweroff
+  message: Going down on resizing
+  condition: True
 _EOF_
 }
 
