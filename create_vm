@@ -113,7 +113,7 @@ function get_input() {
 
 function ensure_requirements() {
   whichbin=$(which which >/dev/null 2>&1 || { echo "This script requires 'which'. Please install and re-run."; exit 1; })
-  for b in virt-install genisoimage tee date tr virsh touch shuf ping; do
+  for b in df virt-install genisoimage tee date tr virsh touch shuf ping; do
     which ${b} >/dev/null 2>&1 || { echo "This script requires '${b}'. Please install and re-run."; exit 1; }
   done
   setbins
@@ -135,6 +135,7 @@ function setbins() {
   teebin=$(which tee)
   genisoimagebin=$(which genisoimage)
   virtinstallbin=$(which virt-install)
+  dfbin=$(which df)
 }
 
 function get_unused_netaddr() {
@@ -315,11 +316,14 @@ function clean_up_cloud_init() {
 }
 
 function check_for_free_space() {
-
+  local s=$(${dfbin} ${image_path} | awk '{ print $4 }' | tail -n 1)
+  # 1073741824 bytes in 1 gb
+  local nb=$(((((${d}*1024)*1024)*1024)))
+  [ ${nb} -ge ${s} ] && { echo "Size exceeds available space, unable to continue."; exit 1; }
 }
 
 function shutdown_for_disk_resize() {
-
+  
 }
 
 function resize_disk() {
@@ -355,12 +359,12 @@ check_for_overwrite
 nuke_and_pave
 write_user_data
 write_meta_data
+check_for_free_space
 copy_template_to_image
 create_iso_for_cloud_init
 create_vm
 pause_for_provision
 clean_up_cloud_init
-check_for_free_space
 shutdown_for_disk_resize
 resize_disk
 start_vm
