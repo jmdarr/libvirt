@@ -31,6 +31,7 @@ image_path="/var/lib/libvirt/images" # the path to where we store our vm qcow2 i
 net_prefix="192.168.0."              # the /24 non-cidr prefix for a network you provision to
 net_firstaddr="100"                  # the first value of the last octet of our /24
 net_lastaddr="200"                   # the last value of the last octet of our /24
+bridge="br0"                         # bridge interface (assuming bridged networking)
 provision_timeout="30"               # provisioning timeout in seconds
 
 ### FUNCTIONS
@@ -293,7 +294,7 @@ function create_iso_for_cloud_init() {
 function create_vm() {
   echo "$(${datebin} -R) Installing the domain and adjusting the configuration..." | ${teebin} -a ${log_file}
   echo "[INFO] Installing with the following parameters:" | ${teebin} -a ${log_file}
-  cmd="${virtinstallbin} --import --name ${e} --ram ${m} --vcpus ${c} --disk ${image},format=qcow2,bus=virtio --disk ${ci_iso},device=cdrom --network bridge=br0,model=virtio --os-type=linux --os-variant=rhel7 --noautoconsole"
+  cmd="${virtinstallbin} --import --name ${e} --ram ${m} --vcpus ${c} --disk ${image},format=qcow2,bus=virtio --disk ${ci_iso},device=cdrom --network bridge=${bridge},model=virtio --os-type=linux --os-variant=rhel7 --noautoconsole"
   echo "${cmd}" | ${teebin} -a ${log_file}
   eval ${cmd}
 }
@@ -349,7 +350,6 @@ meta_data="${image_path}/meta-data"
 ci_iso="${image_path}/${e}-cidata.iso"
 image="${image_path}/${e}.qcow2"
 log_file="${image_path}/${e}.log"
-bridge="virbr0"
 
 check_for_overwrite
 nuke_and_pave
