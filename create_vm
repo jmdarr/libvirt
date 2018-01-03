@@ -38,7 +38,6 @@ provision_timeout="30"               # provisioning timeout in seconds
 ### FUNCTIONS
 function parse_args() {
   local OPTIND v
-  local n=$(get_unused_netaddr)
   i="${net_prefix}${n}"
   while getopts ":e:o:i:d:m:c:u:s:a" v; do
     defaults="n"
@@ -61,7 +60,7 @@ function parse_args() {
        ;;
       i)
        #ip
-       [ '${defaults}' == 'n' ] && i=${OPTARG}
+       [ '${defaults}' == 'n' ] && i=${OPTARG} || i="${net_prefix}$(get_unused_netaddr)"
        ;;
       d)
        #disk
