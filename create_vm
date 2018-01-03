@@ -6,9 +6,6 @@
 # https://cloud.centos.org/centos/7/images/
 
 # TO DO:
-# adjust parse_args to keep the defaults if the parsed arg for
-#    the ip isn't passed - in fact, it shouldn't be
-# finish adjusting the show_help information for arguments
 # finish up testing the wait on ping during prov as well as
 #    the wait on shutdown and the shutdown - those are
 #    untested.
@@ -41,44 +38,57 @@ provision_timeout="30"               # provisioning timeout in seconds
 ### FUNCTIONS
 function parse_args() {
   local OPTIND v
+  local n=$(get_unused_netaddr)
+  i="${net_prefix}${n}"
   while getopts ":e:o:i:d:m:c:u:s:a" v; do
+    defaults="n"
+    if [ ! -z "${v}" ]; then
+      if [[ "${v}" =~ ^\s{1,}$ ]]; then
+        defaults="y"
+      fi
+    else
+      defaults='y'
+    fi
+
     case ${v} in
       e)
        #hostname
-       e=${OPTARG}
+       [ '${defaults}' == 'n' ] && e=${OPTARG}
        ;;
       o)
        #domain
-       o=${OPTARG}
+       [ '${defaults}' == 'n' ] && o=${OPTARG}
        ;;
       i)
        #ip
-       i=${OPTARG}
+       [ '${defaults}' == 'n' ] && i=${OPTARG}
        ;;
       d)
        #disk
-       d=${OPTARG}
+       [ '${defaults}' == 'n' ] && d=${OPTARG}
        ;;
       m)
        #memory
-       m=${OPTARG}
+       [ '${defaults}' == 'n' ] && m=${OPTARG}
        ;;
       c)
        #cpu
-       c=${OPTARG}
+       [ '${defaults}' == 'n' ] && c=${OPTARG}
        ;;
       u)
        #username
-       u=${OPTARG}
+       [ '${defaults}' == 'n' ] && u=${OPTARG}
        ;;
       s)
        #ssh key
-       s=${OPTARG}
+       [ '${defaults}' == 'n' ] && s=${OPTARG}
        ;;
       a)
        #sudo
-       [[ "${OPTARG}" =~ ^[YyNn]$ ]] || { echo "Invalid option value"; exit 1; }
-       a=$(echo "${OPTARG}" | $trbin [:upper:] [:lower:])
+       [ '${defaults}' == 'n' ] && {
+         [[ "${OPTARG}" =~ ^[YyNn]$ ]] || { echo "Invalid option value"; exit 1; }
+         a=$(echo "${OPTARG}" | $trbin [:upper:] [:lower:])
+       }
        ;;
       *)
        show_help
@@ -152,8 +162,7 @@ function get_unused_netaddr() {
 
 function interactive_start() {
   local v=""
-  interactive=1
-  n=$(get_unused_netaddr)
+  local n=$(get_unused_netaddr)
   e=$(get_input "Hostname" "${e}")
   o=$(get_input "DNS Domain" "${o}")
   i=$(get_input "IP" "${n}")
@@ -180,13 +189,14 @@ function show_help() {
   echo '  Options:'
   echo '    -e <shortname>             the short hostname for the new server'
   echo '    -o <dns domain>            the dns domain for the new server'
-  echo '    -i <ip>                    '
-  echo '    -d <disk size in GB>       a'
-  echo '    -m <memory quantity in GB> a'
-  echo '    -c <cpu count>             a'
-  echo '    -u <username>              a'
-  echo '    -s <ssh key>               a'
-  echo '    -a (y|n)                   a'
+  echo "    -i <ip>                    the IP you'd like provisioned. if you do not provide an IP a random IP will be"
+  echo '                                 generated for you and suggested during the presentation of the VM details'
+  echo "    -d <disk size>             the disk size (in GB) you'd like to increase or decrease your image to"
+  echo '    -m <memory quantity>       the quantity of memory assigned to this machine, in MB'
+  echo '    -c <cpu count>             the number of cpus assigned to this vm'
+  echo "    -u <username>              the username you'd like to add on provision"
+  echo '    -s <ssh key>               the ssh key to add for authentication on the provisioned user'
+  echo '    -a (y|n)                   whether to grant sudo access to the provisioned user'
   echo
   exit 1
 }
