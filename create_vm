@@ -309,10 +309,11 @@ function create_vm() {
 function pause_for_provision() {
   echo -n "Pausing for provision (max ${provision_timeout}s)"
   local c=0
-  while [ c < 30 ]; do
-    ping -c 1 -w 1 ${i} && { break; } || echo -n '.'
+  while [ $c < ${provision_timeout} ]; do
+    ping -c 1 -w 1 ${i} >/dev/null 2>&1 && { break; } || echo -n '.'
     c=$((${c}+1))
   done
+  [ $c -eq ${provision_timeout} ] && { echo ' timeout. Exiting. Check network config to ensure ability to ping ${i}.'; } 
 }
 
 function clean_up_cloud_init() {
@@ -328,16 +329,22 @@ function check_for_free_space() {
   [ ${nb} -ge ${s} ] && { echo "Size exceeds available space, unable to continue."; exit 1; }
 }
 
-function shutdown_for_disk_resize() {
-  
+function wait_for_cloud_init_shutdown() {
+  echo -n "Waiting for vm shutdown (max ${provision_timeout}s)"
+  local c=0
+  while [ $c < ${provision_timeout} ]; do
+    ping -c 1 -w 1 ${i} >/dev/null 2>&1 || { break; } && echo -n '.'
+    c=$((${c}+1))
+  done
+  [ $c -eq ${provision_timeout} ] && { echo 'timeout. Exiting. Check vm /var/log/cloud-init.log for failure info'; exit 1; }
 }
 
 function resize_disk() {
-
+  true
 }
 
 function start_vm() {
-
+  true
 }
 
 ### MAIN
@@ -371,7 +378,7 @@ create_iso_for_cloud_init
 create_vm
 pause_for_provision
 clean_up_cloud_init
-shutdown_for_disk_resize
+wait_for_cloud_init_shutdown
 resize_disk
 start_vm
 
