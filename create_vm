@@ -236,12 +236,12 @@ function log() {
 function nuke_and_pave() {
   [ "${overwrite}" == 'y' ] && {
     log "Destroying the '${e}' domain..."
-    rm -rvf ${image_path} 2>&1 >> ${log_file}
+    rm -rf ${image_path}
+    mkdir -p ${image_path}
     $virshbin destroy "${e}" 2>&1 >> ${log_file}
     $virshbin undefine "${e}" 2>&1 >> ${log_file}
-  }
+  } ||  mkdir -p ${image_path}
   log "Creating ${image_path}"
-  mkdir -p ${image_path}
 }
 
 function write_user_data() {
@@ -302,14 +302,14 @@ function create_iso_for_cloud_init() {
   log "Generating ISO for cloud-init with the following params:"
   cmd="${genisoimagebin} -output ${ci_iso} -volid cidata -joliet -r ${user_data} ${meta_data}"
   log "  '${cmd}'"
-  eval ${cmd}
+  eval ${cmd} 2>&1 >> ${log_file}
 }
 
 function create_vm() {
   log "Installing the domain and adjusting the configuration with the following params:"
   cmd="${virtinstallbin} --import --name ${e} --ram ${m} --vcpus ${c} --disk ${image},format=qcow2,bus=virtio --disk ${ci_iso},device=cdrom --network bridge=${bridge},model=virtio --os-type=linux --os-variant=rhel7 --noautoconsole"
   log "  '${cmd}'"
-  eval ${cmd}
+  eval ${cmd} 2>&1 >> ${log_file}
 }
 
 function wait_for_start() {
