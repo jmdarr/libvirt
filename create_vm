@@ -228,17 +228,24 @@ function check_for_overwrite() {
   }
 }
 
+function log() {
+  # log to the log file. can't be used until after log_file is defined.
+  echo "$(date +"%Y%m%d:%T") // ${@}" | ${teebin} -a ${log_file}
+}
+
 function nuke_and_pave() {
-  rm -rf ${image_path}
-  mkdir -p ${image_path}
   [ "${overwrite}" == 'y' ] && {
-    echo "$(${datebin} -R) Destroying the '${e}' domain (if it exists)..." | ${teebin} -a ${log_file}
-    $virshbin destroy "${e}" 2>&1 | ${teebin} -a ${log_file}
-    $virshbin undefine "${e}" 2>&1 | ${teebin} -a ${log_file}
+    log "Destroying the '${e}' domain..."
+    rm -rvf ${image_path} 2>&1 >> ${log_file}
+    $virshbin destroy "${e}" 2>&1 >> ${log_file}
+    $virshbin undefine "${e}" 2>&1 >> ${log_file}
   }
+  log "Creating ${image_path}"
+  mkdir -p ${image_path}
 }
 
 function write_user_data() {
+  log "Writing user_data to '${user_data}'"
   cat > ${user_data} << _EOF_
 #cloud-config
 
@@ -280,66 +287,54 @@ _EOF_
 }
 
 function write_meta_data() {
+  log "Writing meta data to '${meta_data}'"
   echo -e "instance-id: ${e}\nlocal-hostname: ${e}" > ${meta_data}
 }
 
 function copy_template_to_image_and_resize() {
-  echo "$(${datebin} -R) Copying template image '${template}' to '${image}' and expanding to ${d}GB..." | ${teebin} -a ${log_file}
-  ${qemuimgbin} create -f qcow2 -o preallocation=metadata ${image} ${d}G | ${teebin} -a ${log_file}
+  log "Copying template image '${template}' to '${image}' and expanding to ${d}GB..."
+  ${qemuimgbin} create -f qcow2 -o preallocation=metadata ${image} ${d}G 2>&1 >> ${log_file}
   local fs=$(${virtfilesystemsbin} --long -h --all -a ${template} | grep partition | awk '{ print $1 }')
-  ${virtresizebin} --expand ${fs} ${template} ${image} | ${teebin} -a ${log_file}
+  ${virtresizebin} --expand ${fs} ${template} ${image} 2>&1 >> ${log_file}
 }
 
 function create_iso_for_cloud_init() {
-  echo "$(${datebin} -R) Generating ISO for cloud-init..." | ${teebin} -a ${log_file}
-  echo "[INFO] Generating with the following parameters:" | ${teebin} -a ${log_file}
+  log "Generating ISO for cloud-init with the following params:"
   cmd="${genisoimagebin} -output ${ci_iso} -volid cidata -joliet -r ${user_data} ${meta_data}"
-  echo "${cmd}" | ${teebin} -a ${log_file}
+  log "  '${cmd}'"
   eval ${cmd}
 }
 
 function create_vm() {
-  echo "$(${datebin} -R) Installing the domain and adjusting the configuration..." | ${teebin} -a ${log_file}
-  echo "[INFO] Installing with the following parameters:" | ${teebin} -a ${log_file}
+  log "Installing the domain and adjusting the configuration with the following params:"
   cmd="${virtinstallbin} --import --name ${e} --ram ${m} --vcpus ${c} --disk ${image},format=qcow2,bus=virtio --disk ${ci_iso},device=cdrom --network bridge=${bridge},model=virtio --os-type=linux --os-variant=rhel7 --noautoconsole"
-  echo "${cmd}" | ${teebin} -a ${log_file}
+  log "  '${cmd}'"
   eval ${cmd}
 }
 
 function wait_for_start() {
-  echo -n "Pausing for provision (max ${provision_timeout}s)"
+  log "Pausing for provision (max ${provision_timeout}s)"
   local c=0; 
   while [ $c -lt ${provision_timeout} ]; do
-    ping -c 1 -w 1 ${i} >/dev/null 2>&1 && { break; } || echo -n '.'
+    ping -c 1 -w 1 ${i} >/dev/null 2>&1 && { break; } 
     local c=$((${c}+1))
   done
-  [ $c -eq ${provision_timeout} ] && { echo ' timeout. Exiting. Check network config to ensure ability to ping ${i}.'; }
-  echo ' done'
+  [ $c -eq ${provision_timeout} ] && { log "** Timeout, exiting. Check network config to ensure ability to ping ${i}."; }
+  log '** done'
 }
 
 function clean_up_cloud_init() {
-  echo "$(date -R) Cleaning up cloud-init..."
-  virsh change-media ${e} hda --eject --config | ${teebin} -a ${log_file}
-  rm ${user_data} ${ci_iso} 
+  log "Cleaning up cloud-init"
+  virsh change-media ${e} hda --eject --config 2>&1 >> ${log_file}
+  rm -v ${user_data} ${ci_iso} 2>&1 >> ${log_file}
 }
 
 function check_for_free_space() {
+  log "Checking for available free space"
   local availbytes=$(${dfbin} ${image_path} | awk '{ print $4 }' | tail -n 1)
   # 1073741824 bytes in 1 gb
-  # don't forget to add 8gb for the initial qcow2 image, as well
-  local neededbytes=$(((((${d}+8)*1000)*1000)))
-  [ ${neededbytes} -ge ${availbytes} ] && { echo "Size (${neededbytes}) exceeds available space (${availbytes}), unable to continue."; exit 1; }
-}
-
-function wait_for_shutdown() {
-  echo -n "Waiting for vm shutdown (max ${provision_timeout}s)"
-  local c=0
-  while [ $c -lt ${provision_timeout} ]; do
-    ping -c 1 -w 1 ${i} >/dev/null 2>&1 || { break; } && { echo -n '.'; sleep 1; }
-    local c=$((${c}+1))
-  done
-  [ $c -eq ${provision_timeout} ] && { echo 'timeout. Exiting. Check vm /var/log/cloud-init.log for failure info'; exit 1; }
-  echo ' done'
+  local neededbytes=$((((${d}*1000)*1000)))
+  [ ${neededbytes} -ge ${availbytes} ] && { log "Size (${neededbytes}) exceeds available space (${availbytes}), unable to continue."; exit 1; }
 }
 
 ### MAIN
