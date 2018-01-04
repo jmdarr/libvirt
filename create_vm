@@ -305,7 +305,7 @@ function create_vm() {
   eval ${cmd}
 }
 
-function pause_for_provision() {
+function wait_for_start() {
   echo -n "Pausing for provision (max ${provision_timeout}s)"
   local c=0; local pc=0
   while [ $c -lt ${provision_timeout} ]; do
@@ -329,7 +329,7 @@ function check_for_free_space() {
   [ ${neededbytes} -ge ${availbytes} ] && { echo "Size (${neededbytes}) exceeds available space (${availbytes}), unable to continue."; exit 1; }
 }
 
-function wait_for_cloud_init_shutdown() {
+function wait_for_shutdown() {
   echo -n "Waiting for vm shutdown (max ${provision_timeout}s)"
   local c=0
   while [ $c -lt ${provision_timeout} ]; do
@@ -377,9 +377,9 @@ check_for_free_space
 copy_template_to_image
 create_iso_for_cloud_init
 create_vm
-pause_for_provision
+wait_for_start
 clean_up_cloud_init
-wait_for_cloud_init_shutdown
+wait_for_shutdown
 resize_disk
 start_vm
 
