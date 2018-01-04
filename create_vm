@@ -5,14 +5,6 @@
 # and is intended to consume a qcow2 image from:
 # https://cloud.centos.org/centos/7/images/
 
-# TO DO:
-# finish up testing the wait on ping during prov as well as
-#    the wait on shutdown and the shutdown - those are
-#    untested.
-# adjust disk size. keep in mind current image uses 8gb so we
-#    will need to calculate the value the new image should be
-#    minus 8GB
-
 ### VARIABLES
 # option defaults
 e="hostname"   # hostname
@@ -302,14 +294,14 @@ function create_iso_for_cloud_init() {
   log "Generating ISO for cloud-init with the following params:"
   cmd="${genisoimagebin} -output ${ci_iso} -volid cidata -joliet -r ${user_data} ${meta_data}"
   log "  '${cmd}'"
-  eval ${cmd} 2>&1 >> ${log_file}
+  eval "${cmd}" 2>&1 >> ${log_file}
 }
 
 function create_vm() {
   log "Installing the domain and adjusting the configuration with the following params:"
   cmd="${virtinstallbin} --import --name ${e} --ram ${m} --vcpus ${c} --disk ${image},format=qcow2,bus=virtio --disk ${ci_iso},device=cdrom --network bridge=${bridge},model=virtio --os-type=linux --os-variant=rhel7 --noautoconsole"
   log "  '${cmd}'"
-  eval ${cmd} 2>&1 >> ${log_file}
+  eval "${cmd}" 2>&1 >> ${log_file}
 }
 
 function wait_for_start() {
@@ -369,5 +361,5 @@ create_vm
 wait_for_start
 clean_up_cloud_init
 
-echo "All done."
+log "All done"
 echo
