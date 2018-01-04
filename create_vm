@@ -82,7 +82,10 @@ function parse_args() {
 }
 
 function get_confirmation() {
-  [ "${autoyes}" == "y" ] && return 0 || {
+  [ "${autoyes}" == "y" ] && {
+    echo "${@} (y|n)[y]: Skipping due to 'autoyes' being passed"
+    return 0 
+  } || {
     local z=""
     read -e -p "$@ (y|n)[y]: " z
     [[ "${z}" =~ ^[YyNn]$ ]] || z='y'
