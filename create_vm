@@ -46,7 +46,7 @@ function parse_args() {
        ;;
       d)
        #disk
-       [ ${OPTARG} < 8 ] && ${OPTARG}=8
+       [ ${OPTARG} -lt 8 ] && ${OPTARG}=8
        d=${OPTARG}
        ;;
       m)
