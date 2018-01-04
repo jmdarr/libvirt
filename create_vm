@@ -137,7 +137,7 @@ function setbins() {
   virtinstallbin=$(which virt-install)
   dfbin=$(which df)
   qemuimgbin=$(which qemu-img)
-  virtresizebin=$(which virtresizebin)
+  virtresizebin=$(which virt-resize)
   virtfilesystemsbin=$(which virt-filesystems)
 }
 
@@ -308,9 +308,9 @@ function create_vm() {
 
 function wait_for_start() {
   echo -n "Pausing for provision (max ${provision_timeout}s)"
-  local c=0; local pc=0
+  local c=0; 
   while [ $c -lt ${provision_timeout} ]; do
-    ping -c 1 -w 1 ${i} >/dev/null 2>&1 && { local pc=$((${pc}+1)); } || echo -n '.'
+    ping -c 1 -w 1 ${i} >/dev/null 2>&1 && { break; } || echo -n '.'
     local c=$((${c}+1))
   done
   [ $c -eq ${provision_timeout} ] && { echo ' timeout. Exiting. Check network config to ensure ability to ping ${i}.'; }
