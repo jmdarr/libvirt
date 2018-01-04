@@ -255,6 +255,12 @@ preserve_hostname: False
 hostname: ${e}
 fqdn: ${e}.${o}
 
+# get updated packages as well as other things we want
+package_update: true
+package_upgrade: true
+packages:
+  -  bind-utils
+
 # Remove cloud-init when finished with it and write our network config out
 runcmd:
   - [ yum, -y, remove, cloud-init ]
@@ -278,12 +284,11 @@ ssh_authorized_keys:
   - ${s}
 
 # Setup resolv.conf
-manage_resolv_conf: true
-resolv_conf:
-  nameservers: ['192.168.0.3']
-  searchdomains:
-    - solarsquid.local
-  domain: solarsquid.local
+write_files:
+  - path: /etc/resolv.conf
+    content: |
+      nameserver 192.168.0.3
+      search solarsquid.local
 _EOF_
 }
 
