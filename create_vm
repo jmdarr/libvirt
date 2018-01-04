@@ -255,12 +255,6 @@ preserve_hostname: False
 hostname: ${e}
 fqdn: ${e}.${o}
 
-# get updated packages as well as other things we want
-package_update: true
-package_upgrade: true
-packages:
-  -  bind-utils
-
 # Remove cloud-init when finished with it and write our network config out
 runcmd:
   - [ yum, -y, remove, cloud-init ]
