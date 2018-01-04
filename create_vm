@@ -113,7 +113,7 @@ function get_input() {
 
 function ensure_requirements() {
   whichbin=$(which which >/dev/null 2>&1 || { echo "This script requires 'which'. Please install and re-run."; exit 1; })
-  for b in truncate df virt-install genisoimage tee date tr virsh touch shuf ping; do
+  for b in virt-filesystems virt-resize qemu-img df virt-install genisoimage tee date tr virsh touch shuf ping; do
     which ${b} >/dev/null 2>&1 || { echo "This script requires '${b}'. Please install and re-run."; exit 1; }
   done
   setbins
@@ -136,7 +136,9 @@ function setbins() {
   genisoimagebin=$(which genisoimage)
   virtinstallbin=$(which virt-install)
   dfbin=$(which df)
-  truncatebin=$(which truncate)
+  qemuimgbin=$(which qemu-img)
+  virtresizebin=$(which virtresizebin)
+  virtfilesystemsbin=$(which virt-filesystems)
 }
 
 function get_unused_netaddr() {
@@ -248,6 +250,7 @@ fqdn: ${e}.${o}
 # Remove cloud-init when finished with it and write our network config out
 runcmd:
   - [ yum, -y, remove, cloud-init ]
+  - xfs_growfs /dev/vda1
   - sed -i '/IPADDR/d' /etc/sysconfig/network-scripts/ifcfg-eth0
   - echo "IPADDR=${i}" >> /etc/sysconfig/network-scripts/ifcfg-eth0
   - /sbin/service network restart
@@ -273,12 +276,6 @@ resolv_conf:
   searchdomains:
     - solarsquid.local
   domain: solarsquid.local
-
-# shut the server down for disk resizing at the end.
-power_state:
-  mode: poweroff
-  message: Going down on resizing
-  condition: True
 _EOF_
 }
 
@@ -286,9 +283,11 @@ function write_meta_data() {
   echo -e "instance-id: ${e}\nlocal-hostname: ${e}" > ${meta_data}
 }
 
-function copy_template_to_image() {
-  echo "$(${datebin} -R) Copying template image '${template}' to '${image}'..." | ${teebin} -a ${log_file}
-  cp ${template} ${image} || { echo "Failure to copy. Exiting." | ${teebin} -a ${log_file}; exit 1; }
+function copy_template_to_image_and_resize() {
+  echo "$(${datebin} -R) Copying template image '${template}' to '${image}' and expanding to ${d}GB..." | ${teebin} -a ${log_file}
+  ${qemuimgbin} create -f qcow2 -o preallocation=metadata ${image} ${d}G | ${teebin} -a ${log_file}
+  local fs=$(${virtfilesystemsbin} --long -h --all -a ${template} | grep partition | awk '{ print $1 }')
+  ${virtresizebin} --expand ${fs} ${template} ${image} | ${teebin} -a ${log_file}
 }
 
 function create_iso_for_cloud_init() {
@@ -311,7 +310,7 @@ function wait_for_start() {
   echo -n "Pausing for provision (max ${provision_timeout}s)"
   local c=0; local pc=0
   while [ $c -lt ${provision_timeout} ]; do
-    ping -c 1 -w 1 ${i} >/dev/null 2>&1 && { local pc=$(($${pc}+1)) } || echo -n '.'
+    ping -c 1 -w 1 ${i} >/dev/null 2>&1 && { local pc=$((${pc}+1)); } || echo -n '.'
     local c=$((${c}+1))
   done
   [ $c -eq ${provision_timeout} ] && { echo ' timeout. Exiting. Check network config to ensure ability to ping ${i}.'; }
@@ -343,14 +342,6 @@ function wait_for_shutdown() {
   echo ' done'
 }
 
-function resize_disk() {
-  true
-}
-
-function start_vm() {
-  true
-}
-
 ### MAIN
 # error handling
 trap "exit 1" TERM
@@ -377,15 +368,11 @@ nuke_and_pave
 write_user_data
 write_meta_data
 check_for_free_space
-copy_template_to_image
+copy_template_to_image_and_resize
 create_iso_for_cloud_init
 create_vm
 wait_for_start
 clean_up_cloud_init
-wait_for_shutdown
-resize_disk
-start_vm
-wait_for_start
 
 echo "All done."
 echo
