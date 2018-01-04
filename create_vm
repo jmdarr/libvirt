@@ -31,7 +31,7 @@ autoyes="n"                          # variable that's set via cli argument
 ### FUNCTIONS
 function parse_args() {
   local OPTIND v
-  while getopts ":e:o:i:d:m:c:u:s:a" v; do
+  while getopts ":e:o:i:d:m:c:u:s:ay" v; do
     case ${v} in
       e)
        #hostname
