@@ -73,6 +73,7 @@ function parse_args() {
       y)
        #autoyes
        autoyes="y"
+       ;;
       *)
        show_help
        ;;
