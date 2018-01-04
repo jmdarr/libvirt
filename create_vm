@@ -113,7 +113,7 @@ function get_input() {
 
 function ensure_requirements() {
   whichbin=$(which which >/dev/null 2>&1 || { echo "This script requires 'which'. Please install and re-run."; exit 1; })
-  for b in df virt-install genisoimage tee date tr virsh touch shuf ping; do
+  for b in truncate df virt-install genisoimage tee date tr virsh touch shuf ping; do
     which ${b} >/dev/null 2>&1 || { echo "This script requires '${b}'. Please install and re-run."; exit 1; }
   done
   setbins
@@ -136,6 +136,7 @@ function setbins() {
   genisoimagebin=$(which genisoimage)
   virtinstallbin=$(which virt-install)
   dfbin=$(which df)
+  truncatebin=$(which truncate)
 }
 
 function get_unused_netaddr() {
@@ -326,7 +327,8 @@ function clean_up_cloud_init() {
 function check_for_free_space() {
   local availbytes=$(${dfbin} ${image_path} | awk '{ print $4 }' | tail -n 1)
   # 1073741824 bytes in 1 gb
-  local neededbytes=$((((${d}*1000)*1000)))
+  # don't forget to add 8gb for the initial qcow2 image, as well
+  local neededbytes=$(((((${d}+8)*1000)*1000)))
   [ ${neededbytes} -ge ${availbytes} ] && { echo "Size (${neededbytes}) exceeds available space (${availbytes}), unable to continue."; exit 1; }
 }
 
