@@ -18,9 +18,9 @@
 e="hostname"   # hostname
 o="home.local" # domain
 i=""           # ip, intentionally left blank
-d="80"         # disk size, in GB
+d="8"          # disk size, in GB
 m="512"        # memory quantity, in MB
-c="2"          # cpu count
+c="1"          # cpu count
 u="mudkip"     # username to add
                # below: ssh key for user
 s="ssh-rsa THISISNOTAREALHASHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHVAMPIRESSUCK"
@@ -382,6 +382,7 @@ clean_up_cloud_init
 wait_for_shutdown
 resize_disk
 start_vm
+wait_for_start
 
 echo "All done."
 echo
