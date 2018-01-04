@@ -18,7 +18,7 @@
 e="hostname"   # hostname
 o="home.local" # domain
 i=""           # ip, intentionally left blank
-d="8"          # disk size, in GB
+d="8"          # disk size, in GB. 8GB is the minimum as I have not yet written shrinking.
 m="512"        # memory quantity, in MB
 c="1"          # cpu count
 u="mudkip"     # username to add
@@ -54,6 +54,7 @@ function parse_args() {
        ;;
       d)
        #disk
+       [ ${OPTARG} < 8 ] && ${OPTARG}=8
        d=${OPTARG}
        ;;
       m)
