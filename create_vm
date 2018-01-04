@@ -16,7 +16,7 @@ c="1"          # cpu count
 u="mudkip"     # username to add
                # below: ssh key for user
 s="ssh-rsa THISISNOTAREALHASHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHVAMPIRESSUCK"
-a="y"          # sudo access, y/n
+a="n"          # sudo access, y/n
 # others
 template="/full/path/to/CentOS-7-x86_64-GenericCloud-1711.qcow2"
                                      # above: template path
@@ -26,6 +26,7 @@ net_firstaddr="100"                  # the first value of the last octet of our 
 net_lastaddr="200"                   # the last value of the last octet of our /24
 bridge="br0"                         # bridge interface (assuming bridged networking)
 provision_timeout="30"               # provisioning timeout in seconds
+autoyes="n"                          # variable that's set via cli argument
 
 ### FUNCTIONS
 function parse_args() {
@@ -67,9 +68,11 @@ function parse_args() {
        ;;
       a)
        #sudo
-       [[ "${OPTARG}" =~ ^[YyNn]$ ]] || { echo "Invalid option value"; exit 1; }
-       a=$(echo "${OPTARG}" | $trbin [:upper:] [:lower:])
+       a="y"
        ;;
+      y)
+       #autoyes
+       autoyes="y"
       *)
        show_help
        ;;
@@ -79,10 +82,12 @@ function parse_args() {
 }
 
 function get_confirmation() {
-  local z=""
-  read -e -p "$@ (y|n)[y]: " z
-  [[ "${z}" =~ ^[YyNn]$ ]] || z='y'
-  [[ "${z}" =~ ^[Yy]$ ]] && return 0 || return 1
+  [ "${autoyes}" == "y" ] && return 0 || {
+    local z=""
+    read -e -p "$@ (y|n)[y]: " z
+    [[ "${z}" =~ ^[YyNn]$ ]] || z='y'
+    [[ "${z}" =~ ^[Yy]$ ]] && return 0 || return 1
+  }
 }
 
 function get_input() {
