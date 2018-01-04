@@ -361,5 +361,5 @@ create_vm
 wait_for_start
 clean_up_cloud_init
 
-log "All done. SSH to your new VM at '${ip}'"
+log "All done. SSH to your new VM at '${i}'"
 echo
