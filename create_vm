@@ -307,18 +307,19 @@ function create_vm() {
 
 function pause_for_provision() {
   echo -n "Pausing for provision (max ${provision_timeout}s)"
-  local c=0
-  while [ $c < ${provision_timeout} ]; do
-    ping -c 1 -w 1 ${i} >/dev/null 2>&1 && { break; } || echo -n '.'
-    c=$((${c}+1))
+  local c=0; local pc=0
+  while [ $c -lt ${provision_timeout} ]; do
+    ping -c 1 -w 1 ${i} >/dev/null 2>&1 && { local pc=$(($${pc}+1)) } || echo -n '.'
+    local c=$((${c}+1))
   done
-  [ $c -eq ${provision_timeout} ] && { echo ' timeout. Exiting. Check network config to ensure ability to ping ${i}.'; } 
+  [ $c -eq ${provision_timeout} ] && { echo ' timeout. Exiting. Check network config to ensure ability to ping ${i}.'; }
+  echo ' done'
 }
 
 function clean_up_cloud_init() {
   echo "$(date -R) Cleaning up cloud-init..."
   virsh change-media ${e} hda --eject --config | ${teebin} -a ${log_file}
-  rm $USER_DATA $CI_ISO 
+  rm ${user_data} ${ci_iso} 
 }
 
 function check_for_free_space() {
@@ -331,11 +332,12 @@ function check_for_free_space() {
 function wait_for_cloud_init_shutdown() {
   echo -n "Waiting for vm shutdown (max ${provision_timeout}s)"
   local c=0
-  while [ $c < ${provision_timeout} ]; do
-    ping -c 1 -w 1 ${i} >/dev/null 2>&1 || { break; } && echo -n '.'
-    c=$((${c}+1))
+  while [ $c -lt ${provision_timeout} ]; do
+    ping -c 1 -w 1 ${i} >/dev/null 2>&1 || { break; } && { echo -n '.'; sleep 1; }
+    local c=$((${c}+1))
   done
   [ $c -eq ${provision_timeout} ] && { echo 'timeout. Exiting. Check vm /var/log/cloud-init.log for failure info'; exit 1; }
+  echo ' done'
 }
 
 function resize_disk() {
