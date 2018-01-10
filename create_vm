@@ -281,8 +281,8 @@ ssh_authorized_keys:
 write_files:
   - path: /etc/resolv.conf
     content: |
-      nameserver 192.168.0.3
-      search solarsquid.local
+      nameserver 8.8.8.8
+      search home.local
 _EOF_
 }
 
